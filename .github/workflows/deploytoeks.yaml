@@ -12,7 +12,7 @@ env:
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
-  IMAGE_TAG: 1.1
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   deploy:
