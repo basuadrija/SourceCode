@@ -11,7 +11,7 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  CLUSTER_NAME: ${{ vars.EKS_CLUSTER }}
+  EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
   IMAGE_TAG: 1.1
 
 jobs:
@@ -50,7 +50,7 @@ jobs:
       uses: azure/setup-kubectl@v3
 
     - name: Update kubeconfig
-      run: aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
+      run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
 
     - name: Deploy to EKS
       run: |
