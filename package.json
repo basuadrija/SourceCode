@@ -4,8 +4,10 @@
   "description": "A simple Express.js-based microservice app for patients and appointments",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
-  },
+  "start:appointments": "node appointment-service.js",
+  "start:patients": "node patient-service.js"
+}
+,
   "author": "Adrija Basu",
   "license": "ISC",
   "dependencies": {

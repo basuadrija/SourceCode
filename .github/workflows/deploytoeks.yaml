@@ -51,62 +51,15 @@ jobs:
 
     - name: Update kubeconfig
       run: aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
+    
+    - name: Install Ingress controller
+      run: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0-beta.0/deploy/static/provider/aws/deploy.yaml
 
     - name: Deploy to EKS
       run: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: apps/v1
-        kind: Deployment
-        metadata:
-          name: webapp
-        spec:
-          replicas: 2
-          selector:
-            matchLabels:
-              app: webapp
-          template:
-            metadata:
-              labels:
-                app: webapp
-            spec:
-              containers:
-              - name: webapp
-                image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-                ports:
-                - containerPort: 3000
-        ---
-        apiVersion: v1
-        kind: Service
-        metadata:
-          name: webapp-service
-        spec:
-          selector:
-            app: webapp
-          ports:
-            - protocol: TCP
-              port: 80
-              targetPort: 3000
-          type: ClusterIP
-        ---
-        apiVersion: networking.k8s.io/v1
-        kind: Ingress
-        metadata:
-          name: webapp-ingress
-          annotations:
-            nginx.ingress.kubernetes.io/rewrite-target: /
-        spec:
-          ingressClassName: nginx
-          rules:
-          - http:
-              paths:
-              - path: /
-                pathType: Prefix
-                backend:
-                  service:
-                    name: webapp-service
-                    port:
-                      number: 80
-        EOF
+        kubectl apply -f k8s/appointment-deployment.yaml
+        kubectl apply -f k8s/patient-deployment.yaml
+        kubectl apply -f k8s/ingress.yaml
 
     - name: Get Ingress Controller Public IP
       run: |
