@@ -78,15 +78,21 @@ jobs:
         kubectl apply -f k8s/patient-deployment.yaml
         kubectl apply -f k8s/ingress.yaml
 
-    - name: Get Ingress Controller Public IP
+    - name: Wait and verify Ingress availability
       run: |
-        echo "Waiting for Ingress Controller public IP..."
+        echo "Waiting for Ingress route to become available..."
         for i in {1..20}; do
-          EXTERNAL_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
-          if [ -n "$EXTERNAL_IP" ]; then
-            echo "Ingress Controller is available at: http://$EXTERNAL_IP"
-            break
+          HOSTNAME=$(kubectl get ingress healthcare-ingress -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+          if [ -n "$HOSTNAME" ]; then
+            echo "Found hostname: $HOSTNAME"
+            CODE1=$(curl -s -o /dev/null -w "%{http_code}" http://$HOSTNAME/appointments)
+            CODE2=$(curl -s -o /dev/null -w "%{http_code}" http://$HOSTNAME/patients)
+            if [[ "$CODE1" == "200" && "$CODE2" == "200" ]]; then
+              echo "Both endpoints are reachable."
+              echo "Ingress Controller is available at: http://$HOSTNAME"
+              break
+            fi
           fi
-          echo "Waiting... ($i)"
+          echo "Waiting for valid ingress response... ($i)"
           sleep 15
         done
