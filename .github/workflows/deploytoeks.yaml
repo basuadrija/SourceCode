@@ -34,6 +34,24 @@ jobs:
         aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    - name: Login to Amazon ECR
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build Docker image
+      run: |
+        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Push Docker image to ECR
+      run: |
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+
     - name: Install eksctl and jq
       run: |
         curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
@@ -47,13 +65,7 @@ jobs:
           --region ${{ env.AWS_REGION }} \
           --approve
 
-    - name: Create IAM policy for ALB Controller
-      run: |
-        curl -o iam-policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.1/docs/install/iam_policy.json
-        aws iam create-policy \
-          --policy-name AWSLoadBalancerControllerIAMPolicy \
-          --policy-document file://iam-policy.json || echo "Policy may already exist"
-
+  
     - name: Create Kubernetes service account for ALB Controller
       run: |
         eksctl create iamserviceaccount \
@@ -97,23 +109,7 @@ jobs:
           sleep 10
         done
 
-    - name: Login to Amazon ECR
-      uses: aws-actions/amazon-ecr-login@v1
-
-    - name: Build Docker image
-      run: |
-        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-    - name: Push Docker image to ECR
-      run: |
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-
-    - name: Update kubeconfig
-      run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+    
 
     - name: Deploy application Deployments and Services
       run: |
