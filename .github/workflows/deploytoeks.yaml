@@ -98,7 +98,7 @@ jobs:
             break
           fi
           echo "Waiting for webhook to become ready ($i)..."
-          sleep 10
+          sleep 600
         done
 
     - name: Apply Ingress Resource
