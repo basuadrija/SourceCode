@@ -65,7 +65,6 @@ jobs:
           --region ${{ env.AWS_REGION }} \
           --approve
 
-  
     - name: Create Kubernetes service account for ALB Controller
       run: |
         eksctl create iamserviceaccount \
@@ -97,8 +96,10 @@ jobs:
           --set region=${{ env.AWS_REGION }} \
           --set vpcId=$VPC_ID
 
-    - name: Wait for ALB webhook to become ready
+    - name: Wait for ALB Controller and webhook to become ready
       run: |
+        kubectl rollout status deployment/aws-load-balancer-controller -n kube-system
+
         for i in {1..10}; do
           READY=$(kubectl get endpoints aws-load-balancer-webhook-service -n kube-system -o jsonpath='{.subsets[*].addresses[*].ip}')
           if [ -n "$READY" ]; then
@@ -109,8 +110,6 @@ jobs:
           sleep 10
         done
 
-    
-
     - name: Deploy application Deployments and Services
       run: |
         kubectl apply -f k8s/appointment-deployment.yaml
@@ -119,10 +118,6 @@ jobs:
     - name: Apply Ingress Resource
       run: |
         kubectl apply -f k8s/ingress.yaml
-
-    - name: Verify ALB Controller Deployment
-      run: |
-        kubectl rollout status deployment/aws-load-balancer-controller -n kube-system
 
     - name: Verify Ingress and Print URL
       run: |
