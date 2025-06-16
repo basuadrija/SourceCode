@@ -9,10 +9,12 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
   IMAGE_TAG: ${{ github.sha }}
+  AWS_ACCOUNT_ID: 794038216301
 
 jobs:
   deploy:
@@ -37,105 +39,97 @@ jobs:
     - name: Login to Amazon ECR
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build Docker image
+    - name: Build and Push Docker Image
       run: |
         docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
         docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-    - name: Push Docker image to ECR
-      run: |
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+
+    - name: Install eksctl and jq
+      run: |
+        curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+        sudo mv /tmp/eksctl /usr/local/bin
+        sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Download AWS Load Balancer IAM policy
+      run: |
+        curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.11.0/docs/install/iam_policy.json
+
+    - name: Create IAM policy if it doesn't exist
+      run: |
+        POLICY_EXISTS=$(aws iam list-policies --query "Policies[?PolicyName=='AWSLoadBalancerControllerIAMPolicy'].Arn" --output text)
+        if [ -z "$POLICY_EXISTS" ]; then
+          echo "Creating IAM policy..."
+          aws iam create-policy \
+            --policy-name AWSLoadBalancerControllerIAMPolicy \
+            --policy-document file://iam_policy.json
+        else
+          echo "IAM policy already exists: $POLICY_EXISTS"
+        fi
+
+    - name: Create IAM role and Kubernetes service account
+      run: |
+        eksctl create iamserviceaccount \
+          --cluster=$EKS_CLUSTER \
+          --region=$AWS_REGION \
+          --namespace=kube-system \
+          --name=aws-load-balancer-controller \
+          --role-name AmazonEKSLoadBalancerControllerRole \
+          --attach-policy-arn=arn:aws:iam::$AWS_ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy \
+          --approve
+
+    - name: Add AWS EKS Helm repo
+      run: |
+        helm repo add eks https://aws.github.io/eks-charts
+        helm repo update
+
+    - name: Install AWS Load Balancer Controller via Helm
+      run: |
+        VPC_ID=$(aws eks describe-cluster \
+          --name $EKS_CLUSTER \
+          --region $AWS_REGION \
+          --query "cluster.resourcesVpcConfig.vpcId" \
+          --output text)
+
+        helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+          -n kube-system \
+          --set clusterName=$EKS_CLUSTER \
+          --set serviceAccount.create=false \
+          --set serviceAccount.name=aws-load-balancer-controller \
+          --set region=$AWS_REGION \
+          --set vpcId=$VPC_ID
+
+    - name: Wait for ALB Controller to be ready
+      run: |
+        kubectl rollout status deployment/aws-load-balancer-controller -n kube-system
+
+    - name: Deploy unified Deployment and Service
+      run: |
+        sed "s|<IMAGE_TAG>|$IMAGE_TAG|g" k8s/healthcaredeployment.yaml | kubectl apply -f -
 
 
-    # - name: Setup kubectl
-    #   uses: azure/setup-kubectl@v3
+    - name: Apply Ingress Resource
+      run: |
+        kubectl apply -f k8s/ingress.yaml
 
-    # - name: Update kubeconfig
-    #   run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
-
-    # - name: Install eksctl and jq
-    #   run: |
-    #     curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-    #     sudo mv /tmp/eksctl /usr/local/bin
-    #     sudo apt-get update && sudo apt-get install -y jq
-
-    # - name: Associate IAM OIDC provider
-    #   run: |
-    #     eksctl utils associate-iam-oidc-provider \
-    #       --cluster ${{ env.EKS_CLUSTER }} \
-    #       --region ${{ env.AWS_REGION }} \
-    #       --approve
-
-    # - name: Create Kubernetes service account for ALB Controller
-    #   run: |
-    #     eksctl create iamserviceaccount \
-    #       --cluster ${{ env.EKS_CLUSTER }} \
-    #       --region ${{ env.AWS_REGION }} \
-    #       --namespace kube-system \
-    #       --name aws-load-balancer-controller \
-    #       --attach-role-arn arn:aws:iam::794038216301:role/aws-load-balancer-controller \
-    #       --approve
-
-    # - name: Add AWS EKS Helm repo
-    #   run: |
-    #     helm repo add eks https://aws.github.io/eks-charts
-    #     helm repo update
-
-    # - name: Install AWS Load Balancer Controller via Helm
-    #   run: |
-    #     VPC_ID=$(aws eks describe-cluster \
-    #       --name ${{ env.EKS_CLUSTER }} \
-    #       --region ${{ env.AWS_REGION }} \
-    #       --query "cluster.resourcesVpcConfig.vpcId" \
-    #       --output text)
-
-    #     helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-    #       -n kube-system \
-    #       --set clusterName=${{ env.EKS_CLUSTER }} \
-    #       --set serviceAccount.create=false \
-    #       --set serviceAccount.name=aws-load-balancer-controller \
-    #       --set region=${{ env.AWS_REGION }} \
-    #       --set vpcId=$VPC_ID
-
-    # - name: Wait for ALB Controller and webhook to become ready
-    #   run: |
-    #     kubectl rollout status deployment/aws-load-balancer-controller -n kube-system
-
-    #     for i in {1..10}; do
-    #       READY=$(kubectl get endpoints aws-load-balancer-webhook-service -n kube-system -o jsonpath='{.subsets[*].addresses[*].ip}')
-    #       if [ -n "$READY" ]; then
-    #         echo "Webhook service is ready."
-    #         break
-    #       fi
-    #       echo "Waiting for webhook to become ready ($i)..."
-    #       sleep 10
-    #     done
-
-    # - name: Deploy application Deployments and Services
-    #   run: |
-    #     kubectl apply -f k8s/appointment-deployment.yaml
-    #     kubectl apply -f k8s/patient-deployment.yaml
-
-    # - name: Apply Ingress Resource
-    #   run: |
-    #     kubectl apply -f k8s/ingress.yaml
-
-    # - name: Verify Ingress and Print URL
-    #   run: |
-    #     echo "Waiting for Ingress hostname and health..."
-    #     for i in {1..20}; do
-    #       HOSTNAME=$(kubectl get ingress healthcare-ingress -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
-    #       if [ -n "$HOSTNAME" ]; then
-    #         echo "Found hostname: $HOSTNAME"
-    #         CODE1=$(curl -s -o /dev/null -w "%{http_code}" http://$HOSTNAME/appointments)
-    #         CODE2=$(curl -s -o /dev/null -w "%{http_code}" http://$HOSTNAME/patients)
-    #         if [[ "$CODE1" == "200" || "$CODE1" == "404" || "$CODE1" == "403" ]]; then
-    #           echo "Ingress is up and routing traffic."
-    #           echo "Ingress URL: http://$HOSTNAME"
-    #           break
-    #         fi
-    #       fi
-    #       echo "Waiting for valid ingress response... ($i)"
-    #       sleep 15
-    #     done
+    - name: Verify Ingress and Print URL
+      run: |
+        echo "Waiting for Ingress hostname and health..."
+        for i in {1..20}; do
+          HOSTNAME=$(kubectl get ingress healthcare-ingress -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+          if [ -n "$HOSTNAME" ]; then
+            echo "Ingress available at: http://$HOSTNAME"
+            curl -s http://$HOSTNAME/health || true
+            curl -s http://$HOSTNAME/appointments || true
+            curl -s http://$HOSTNAME/patients || true
+            break
+          fi
+          echo "Waiting for valid ingress response... ($i)"
+          sleep 15
+        done

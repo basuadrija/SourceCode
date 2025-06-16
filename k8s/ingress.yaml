@@ -15,13 +15,13 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: appointment-service
+                name: healthcare-service
                 port:
                   number: 80
           - path: /patients
             pathType: Prefix
             backend:
               service:
-                name: patient-service
+                name: healthcare-service
                 port:
                   number: 80
