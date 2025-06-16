@@ -1,15 +1,10 @@
 {
-  "name": "healthcare-microservices",
+  "name": "healthcare-service",
   "version": "1.0.0",
-  "description": "A simple Express.js-based microservice app for patients and appointments",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-  "start:appointments": "node appointment-service.js",
-  "start:patients": "node patient-service.js"
-}
-,
-  "author": "Adrija Basu",
-  "license": "ISC",
+    "start": "node index.js"
+  },
   "dependencies": {
     "express": "^4.18.2"
   }

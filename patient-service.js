@@ -1,19 +1,16 @@
 const express = require('express');
-const app = express();
-const port = process.env.PORT || 3002;
-
-app.use(express.json());
+const router = express.Router();
 
 let patients = [
   { id: '1', name: 'John Doe', age: 30, condition: 'Healthy' },
   { id: '2', name: 'Jane Smith', age: 45, condition: 'Hypertension' }
 ];
 
-app.get('/health', (req, res) => {
+router.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'Patient Service' });
 });
 
-app.get('/patients', (req, res) => {
+router.get('/', (req, res) => {
   res.json({
     message: 'Patients retrieved successfully',
     count: patients.length,
@@ -21,7 +18,7 @@ app.get('/patients', (req, res) => {
   });
 });
 
-app.get('/patients/:id', (req, res) => {
+router.get('/:id', (req, res) => {
   const patient = patients.find(p => p.id === req.params.id);
   if (patient) {
     res.json({ message: 'Patient found', patient: patient });
@@ -30,7 +27,7 @@ app.get('/patients/:id', (req, res) => {
   }
 });
 
-app.post('/patients', (req, res) => {
+router.post('/', (req, res) => {
   const { name, age, condition } = req.body;
   if (!name || !age) {
     return res.status(400).json({ error: 'Name and age are required' });
@@ -45,6 +42,4 @@ app.post('/patients', (req, res) => {
   res.status(201).json({ message: 'Patient added successfully', patient: newPatient });
 });
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Patient service listening at http://0.0.0.0:${port}`);
-});
+module.exports = router;

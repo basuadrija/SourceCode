@@ -36,17 +36,15 @@ jobs:
     - name: Login to Amazon ECR
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build and Push Appointment Service Image
+    - name: Build Docker image
       run: |
-        docker build -t gitops-webapp:appointment --build-arg SERVICE_FILE=appointment-service.js -f Dockerfile .
-        docker tag gitops-webapp:appointment $ECR_REGISTRY/gitops-webapp:appointment-${IMAGE_TAG}
-        docker push $ECR_REGISTRY/gitops-webapp:appointment-${IMAGE_TAG}
+        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: Build and Push Patient Service Image
+    - name: Push Docker image to ECR
       run: |
-        docker build -t gitops-webapp:patient --build-arg SERVICE_FILE=patient-service.js -f Dockerfile .
-        docker tag gitops-webapp:patient $ECR_REGISTRY/gitops-webapp:patient-${IMAGE_TAG}
-        docker push $ECR_REGISTRY/gitops-webapp:patient-${IMAGE_TAG}
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
 
 
     # - name: Setup kubectl
