@@ -10,7 +10,6 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
   IMAGE_TAG: ${{ github.sha }}
 
@@ -37,14 +36,18 @@ jobs:
     - name: Login to Amazon ECR
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build Docker image
+    - name: Build and Push Appointment Service Image
       run: |
-        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker build -t gitops-webapp:appointment --build-arg SERVICE_FILE=appointment-service.js -f Dockerfile .
+        docker tag gitops-webapp:appointment $ECR_REGISTRY/gitops-webapp:appointment-${IMAGE_TAG}
+        docker push $ECR_REGISTRY/gitops-webapp:appointment-${IMAGE_TAG}
 
-    - name: Push Docker image to ECR
+    - name: Build and Push Patient Service Image
       run: |
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker build -t gitops-webapp:patient --build-arg SERVICE_FILE=patient-service.js -f Dockerfile .
+        docker tag gitops-webapp:patient $ECR_REGISTRY/gitops-webapp:patient-${IMAGE_TAG}
+        docker push $ECR_REGISTRY/gitops-webapp:patient-${IMAGE_TAG}
+
 
     # - name: Setup kubectl
     #   uses: azure/setup-kubectl@v3
