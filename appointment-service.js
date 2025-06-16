@@ -1,19 +1,16 @@
 const express = require('express');
-const app = express();
-const port = process.env.PORT || 3001;
-
-app.use(express.json());
+const router = express.Router();
 
 let appointments = [
   { id: '1', patientId: '1', date: '2023-06-15', time: '10:00', doctor: 'Dr. Smith' },
   { id: '2', patientId: '2', date: '2023-06-16', time: '14:30', doctor: 'Dr. Johnson' }
 ];
 
-app.get('/health', (req, res) => {
+router.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'Appointment Service' });
 });
 
-app.get('/appointments', (req, res) => {
+router.get('/', (req, res) => {
   res.json({
     message: 'Appointments retrieved successfully',
     count: appointments.length,
@@ -21,7 +18,7 @@ app.get('/appointments', (req, res) => {
   });
 });
 
-app.get('/appointments/:id', (req, res) => {
+router.get('/:id', (req, res) => {
   const appointment = appointments.find(a => a.id === req.params.id);
   if (appointment) {
     res.json({ message: 'Appointment found', appointment: appointment });
@@ -30,7 +27,7 @@ app.get('/appointments/:id', (req, res) => {
   }
 });
 
-app.post('/appointments', (req, res) => {
+router.post('/', (req, res) => {
   const { patientId, date, time, doctor } = req.body;
   if (!patientId || !date || !time || !doctor) {
     return res.status(400).json({ error: 'Patient ID, date, time, and doctor are required' });
@@ -46,7 +43,7 @@ app.post('/appointments', (req, res) => {
   res.status(201).json({ message: 'Appointment scheduled successfully', appointment: newAppointment });
 });
 
-app.get('/appointments/patient/:patientId', (req, res) => {
+router.get('/patient/:patientId', (req, res) => {
   const patientId = req.params.patientId;
   const patientAppointments = appointments.filter(appt => appt.patientId === patientId);
   if (patientAppointments.length > 0) {
@@ -59,6 +56,4 @@ app.get('/appointments/patient/:patientId', (req, res) => {
   }
 });
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Appointment service listening at http://0.0.0.0:${port}`);
-});
+module.exports = router;
