@@ -3,22 +3,13 @@ kind: Ingress
 metadata:
   name: healthcare-ingress
   annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: alb
+  ingressClassName: nginx
   rules:
     - http:
         paths:
           - path: /appointments
-            pathType: Prefix
-            backend:
-              service:
-                name: healthcare-service
-                port:
-                  number: 80
-          - path: /patients
             pathType: Prefix
             backend:
               service:
