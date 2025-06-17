@@ -16,3 +16,10 @@ spec:
                 name: healthcare-service
                 port:
                   number: 80
+          - path: /patients
+            pathType: Prefix
+            backend:
+              service:
+                name: healthcare-service
+                port:
+                  number: 80 
